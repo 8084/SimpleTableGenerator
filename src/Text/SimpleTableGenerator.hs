@@ -79,7 +79,7 @@ simpleTableConfig =
   horizontalPadding = 1,
   verticalPadding = 0,
   paddingStr = " ",
-  emptyCellStr = "-"
+  emptyCellStr = ""
   }
 
 makeDefaultSimpleTable table =
@@ -97,8 +97,8 @@ makeSimpleTable config table =
     makeTextTable table
     where
       processedConfig =
-        constructPaddingFunctions config
-
+        constructPaddingFunctions $ validateConfig config
+      
 -- table processing
 
 
@@ -405,6 +405,13 @@ constructPaddingFunctions config = config {
   horizontalPadding = 0,
   verticalPadding = 0
   }
+
+validateConfig config
+  | 0 == length (paddingStr config) = error "paddingStr is empty!"
+  | 11 > length (tableBorders config) = error "tableBorders must be 11 characters length!"
+  | 0 > horizontalPadding config = error "horizontalPadding must be >= 0!"
+  | 0 > verticalPadding config = error "verticalPadding must be >= 0!"
+  | otherwise = config
 
 -- functions
 
