@@ -1,4 +1,4 @@
-# SimpeTableGenerator
+# SimpleTableGenerator
 
 ## About
 
