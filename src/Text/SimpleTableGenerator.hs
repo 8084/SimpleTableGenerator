@@ -333,25 +333,28 @@ showTable textTable = strJoin "\n" $
   map (strJoin "\n") $
   map2 (strJoin "") $
   map transpose textTable
+      where
+        strJoin :: String -> [String] -> String
+        strJoin separator = foldr1 (\x y -> x ++ separator ++ y)
 
 -- horizontal padding functions
 simpleTableLeftPad :: String -> Int -> String -> String
 simpleTableLeftPad paddingStr width str
-  | length str > width = error "String's length is greater than maximum!"
+  | length str > width = error "SimpleTableGenerator: String's length is greater than maximum!"
   | otherwise = padding ++ str
     where
       padding = take (width - length str) $ concat $ repeat paddingStr
 
 simpleTableRightPad :: String -> Int -> String -> String
 simpleTableRightPad paddingStr width str
-  | length str > width = error "String's length is greater than maximum!"
+  | length str > width = error "SimpleTableGenerator: String's length is greater than maximum!"
   | otherwise = str ++ padding
     where
       padding = take (width - length str) $ concat $ repeat paddingStr
 
 simpleTableCenterPad :: String -> Int -> String -> String
 simpleTableCenterPad paddingStr width str
-  | length str > width = error "String's length is greater than maximum!"
+  | length str > width = error "SimpleTableGenerator: String's length is greater than maximum!"
   | even (width - length str) = halfPadding ++ str ++ halfPadding
   | otherwise = halfPadding ++ str ++ take (halfWidth + 1) padding
     where
@@ -362,7 +365,7 @@ simpleTableCenterPad paddingStr width str
 -- vertical padding functions
 simpleTableBottomPad :: String -> Int -> Cell -> [String]
 simpleTableBottomPad cellStr height cell
-  | length cell > height = error "Cell's height is greater than maximum!"
+  | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
   | length cell == height = cell
   | otherwise = cell ++ padding
     where
@@ -370,7 +373,7 @@ simpleTableBottomPad cellStr height cell
 
 simpleTableTopPad :: String -> Int -> Cell -> [String]
 simpleTableTopPad cellStr height cell
-  | length cell > height = error "Cell's height is greater than maximum!"
+  | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
   | length cell == height = cell
   | otherwise = padding ++ cell    
     where
@@ -378,7 +381,7 @@ simpleTableTopPad cellStr height cell
 
 simpleTableMiddlePad :: String -> Int -> Cell -> [String]
 simpleTableMiddlePad cellStr height cell
-  | length cell > height = error "Cell's height is greater than maximum!"
+  | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
   | length cell == height = cell
   | even (height - length cell) = halfPadding ++ cell ++ halfPadding
   | otherwise = halfPadding ++ cell ++ halfPadding ++ [""]
@@ -407,10 +410,10 @@ constructPaddingFunctions config = config {
   }
 
 validateConfig config
-  | 0 == length (paddingStr config) = error "paddingStr is empty!"
-  | 11 > length (tableBorders config) = error "tableBorders must be 11 characters length!"
-  | 0 > horizontalPadding config = error "horizontalPadding must be >= 0!"
-  | 0 > verticalPadding config = error "verticalPadding must be >= 0!"
+  | 0 == length (paddingStr config) = error "SimpleTableGenerator: paddingStr is empty!"
+  | 11 /= length (tableBorders config) = error "SimpleTableGenerator: tableBorders must be a string of 11 characters!"
+  | 0 > horizontalPadding config = error "SimpleTableGenerator: horizontalPadding must be >= 0!"
+  | 0 > verticalPadding config = error "SimpleTableGenerator: verticalPadding must be >= 0!"
   | otherwise = config
 
 -- functions
@@ -418,5 +421,3 @@ validateConfig config
 map2 :: (a -> b) -> [[a]] -> [[b]]
 map2 = (.) map map
 
-strJoin :: String -> [String] -> String
-strJoin separator = foldr1 (\x y -> x ++ separator ++ y)
