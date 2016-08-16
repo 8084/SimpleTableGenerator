@@ -54,7 +54,7 @@ data CellWrapper =
   bottom, bottomLeft, left:: String
   } deriving (Show)
 
--- data type that represents table confuguration
+-- data type that represents table configuration
 data SimpleTableConfig =
   SimpleTableConfig {
   tableBorders :: String,
