@@ -5,13 +5,13 @@ module Text.SimpleTableGenerator (
   SimpleTableConfig,
   --
   simpleTableConfig,
-  tableBorders, 
-  colMinWidths,  
-  rowMinHeights, 
-  padFunction,   
-  cellPadFunction, 
-  horizontalPadding, 
-  verticalPadding, 
+  tableBorders,
+  colMinWidths,
+  rowMinHeights,
+  padFunction,
+  cellPadFunction,
+  horizontalPadding,
+  verticalPadding,
   paddingStr,
   --
   simpleTableLeftPad,
@@ -19,6 +19,7 @@ module Text.SimpleTableGenerator (
   simpleTableRightPad,
   --
   simpleTableBottomPad,
+  simpleTableMiddlePad,
   simpleTableTopPad,
   --
   simpleTableAddVPadding,
@@ -38,7 +39,7 @@ import Data.List (transpose)
 
 -- types:
 type Table = [Row]
-type Row   = [Cell] 
+type Row   = [Cell]
 type Cell  = [CellLine]
 type CellLine = String  -- cells can be multiline
 type CellSize  = (Int, Int)
@@ -98,7 +99,7 @@ makeSimpleTable config table =
     where
       processedConfig =
         constructPaddingFunctions $ validateConfig config
-      
+
 -- table processing
 
 
@@ -109,7 +110,7 @@ makeTextTable :: [[String]] -> TextTable
 makeTextTable = makeTextTableWithShow id
 
 makeTextTableWithShow :: Show a => (a -> String) -> [[a]] -> TextTable
-makeTextTableWithShow showFunction table = 
+makeTextTableWithShow showFunction table =
     map (\x -> map showFunction x) table
 
 
@@ -119,7 +120,7 @@ normalizeColonCount :: SimpleTableConfig -> TextTable -> TextTable
 normalizeColonCount config = normalizeColonCountWithStr (emptyCellStr config)
 
 normalizeColonCountWithStr :: String -> TextTable -> TextTable
-normalizeColonCountWithStr emptyCellStr textTable = 
+normalizeColonCountWithStr emptyCellStr textTable =
     map (\row -> addExtraCells row) textTable
     where
         addExtraCells row
@@ -142,19 +143,19 @@ makeCells = makeCellsWith "\n"
 
 makeCellsWith :: String -> TextTable -> Table
 makeCellsWith lineSeparator textTable =
-    map (\rowStr  -> map 
+    map (\rowStr  -> map
             (\cellStr -> splitCell cellStr) rowStr) textTable
     where
         splitCell :: String -> Cell
         splitCell cellStr = splitOn lineSeparator cellStr
 
 getCellSizeTable :: Table -> CellSizeTable
-getCellSizeTable = (.) map map getCellSize
+getCellSizeTable = map2 getCellSize
 
 get2DlistSize list2d = (maximum $ map length list2d, length list2d)
 
 getCellSize :: Cell -> CellSize
-getCellSize = get2DlistSize 
+getCellSize = get2DlistSize
 
 
 -- part 4:
@@ -165,13 +166,13 @@ padTableCells config table = (padCellLines . addCellLines) table
   where
     -- adds empty `CellLine`s to each `Cell`
     addCellLines table = zipWith addExtraCellLines table realRowHeights -- (rowHeights (getCellSizeTable table))
-    addExtraCellLines row height = map 
+    addExtraCellLines row height = map
       (\cell -> (cellPadFunction config) "\n" height cell) row
     -- adds extra spaces to each `CellLine`
     padCellLines table = transpose $
       zipWith padCellList (transpose table) realColWidths
-    padCellList  col width = map 
-      (\cell -> map 
+    padCellList  col width = map
+      (\cell -> map
                (\celLine ->
                  (padFunction config) (paddingStr config) width celLine)
                cell) col
@@ -293,7 +294,7 @@ appendBorders table =
             else
             cell) .
          -- append right
-         (\ cell -> 
+         (\ cell ->
           if colNum == width then
              [head cell] ++ (zipWith (++) (tail cell) (repeat right))
            else
@@ -333,9 +334,12 @@ showTable textTable = strJoin "\n" $
   map (strJoin "\n") $
   map2 (strJoin "") $
   map transpose textTable
-      where
-        strJoin :: String -> [String] -> String
-        strJoin separator = foldr1 (\x y -> x ++ separator ++ y)
+    where
+      strJoin :: String -> [String] -> String
+      strJoin separator lst = if null lst then
+                                ""
+                              else
+                                foldr1 (\x y -> x ++ separator ++ y) lst
 
 -- horizontal padding functions
 simpleTableLeftPad :: String -> Int -> String -> String
@@ -375,7 +379,7 @@ simpleTableTopPad :: String -> Int -> Cell -> [String]
 simpleTableTopPad cellStr height cell
   | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
   | length cell == height = cell
-  | otherwise = padding ++ cell    
+  | otherwise = padding ++ cell
     where
       padding = replicate (height - length cell) ""
 
@@ -420,4 +424,3 @@ validateConfig config
 
 map2 :: (a -> b) -> [[a]] -> [[b]]
 map2 = (.) map map
-
