@@ -2,17 +2,9 @@ module Text.SimpleTableGenerator (
   makeSimpleTable,
   makeDefaultSimpleTable,
   --
-  SimpleTableConfig,
+  SimpleTableConfig (..),
   --
   simpleTableConfig,
-  tableBorders,
-  colMinWidths,
-  rowMinHeights,
-  padFunction,
-  cellPadFunction,
-  horizontalPadding,
-  verticalPadding,
-  paddingStr,
   --
   simpleTableLeftPad,
   simpleTableCenterPad,
@@ -49,27 +41,35 @@ type TextTable = [[String]]
 
 data CellWrapper =
   CellWrapper {
-  cell :: Cell,
-  rowNum, colNum, cellWidth, cellHeight :: Int,
-  topLeft, top, topRight, right, bottomRight,
-  bottom, bottomLeft, left:: String
+    cell :: Cell,
+    rowNum, colNum, cellWidth, cellHeight :: Int,
+    topLeft, top, topRight, right, bottomRight,
+    bottom, bottomLeft, left :: String
   } deriving (Show)
 
--- data type that represents table configuration
+-- | Data type that represents table configuration.
 data SimpleTableConfig =
   SimpleTableConfig {
+  -- | String containing table border characters, in order like this: "┌┬┐├┼┤└┴┘─│".
+  -- Must be exactly 11 characters, otherwise error will be thrown.
   tableBorders :: String,
+  -- | Minimum widths for each column, from left to right.
   colMinWidths :: [Int],
+  -- | Minimum heights for each row, from top to bottom.
   rowMinHeights :: [Int],
   padFunction :: String -> Int -> String -> String,
   cellPadFunction :: String -> Int -> [String] -> [String],
+  -- | Width of left and right margins.
   horizontalPadding :: Int,
+  -- | Height of top and bottom margins.
   verticalPadding :: Int,
+  -- | String used to fill in paddings. \" \" by default.
   paddingStr :: String,
+  -- | String used to fill in empty cells. \"\" by default.
   emptyCellStr :: String
   }
 
--- default table config
+-- | Default table config.
 simpleTableConfig =
   SimpleTableConfig {
   tableBorders = "┌┬┐├┼┤└┴┘─│",
@@ -83,9 +83,30 @@ simpleTableConfig =
   emptyCellStr = ""
   }
 
+-- | Create table using 'simpleTableConfig'.
+-- Example usage:
+--
+-- @
+-- putStrLn $ makeDefaultSimpleTable [["1","2","3"], [\"One\",\"Two\",\"Three\"], [\"First\", \"Second\"]]
+-- @
 makeDefaultSimpleTable table =
   makeSimpleTable simpleTableConfig table
 
+-- | Example usage:
+--
+-- @
+-- putStrLn $ makeSimpleTable simpleTableConfig {
+--   tableBorders = "+++++++++-|",
+--   colMinWidths  = [3, 4],
+--   rowMinHeights = [2],
+--   padFunction   = 'simpleTableLeftPad',
+--   cellPadFunction = 'simpleTableBottomPad',
+--   horizontalPadding = 0,
+--   verticalPadding = 1,
+--   paddingStr = ".,`"
+-- } [["a"], ["b", "c"]]
+-- @
+makeSimpleTable :: SimpleTableConfig -> [[String]] -> String
 makeSimpleTable config table =
     showTable $
     unwrapTable $
@@ -197,6 +218,7 @@ colWidths sizeTable  = map
 -- part 5:
 -- join CellLines
 
+-- | Join 'CellLine's
 wrapTable config table = wrapCells $ addCellCoords table
   where
     addCellCoords :: Table -> [[(Int, Int, Cell)]]

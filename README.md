@@ -39,7 +39,7 @@ putStrLn $ makeSimpleTable simpleTableConfig {
     horizontalPadding = 0,
     verticalPadding = 1,
     paddingStr = ".,`"
-    } [["a"],["b","c"]]
+    } [["a"], ["b", "c"]]
 ```
 ```
 +---+----+
@@ -65,6 +65,7 @@ You are not able to set maximum cell sizes because they are calculating from pas
 
 ### Padding cells
 There are two ways of customizing padding style:
+
 1. By changing `horizontalPadding` and/or `verticalPadding` of `SimpleTableConfig`
 2. By passing your own padding functions as `padFunction` and/or `cellPadFunction`
 
