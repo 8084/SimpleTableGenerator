@@ -1,3 +1,10 @@
+-- | This library is for drawing text tables.
+--
+-- Pass a 2D-list of strings and get a single string with table contents.
+--
+-- @
+-- makeDefaultSimpleTable :: [[String]] -> String
+-- @
 module Text.SimpleTableGenerator (
   makeSimpleTable,
   makeDefaultSimpleTable,
@@ -13,21 +20,18 @@ module Text.SimpleTableGenerator (
   simpleTableBottomPad,
   simpleTableMiddlePad,
   simpleTableTopPad,
-  --
-  simpleTableAddVPadding,
   ) where
 
 import Data.List.Split (splitOn)
 import Data.List (transpose)
 
 -- types:
-type Table = [Row]
-type Row   = [Cell]
-type Cell  = [CellLine]
 type CellLine = String  -- cells can be multiline
+type Cell  = [CellLine]
+type Row   = [Cell]
+type Table = [Row]
 type CellSize  = (Int, Int)
 type CellSizeTable = [[CellSize]]
-type TableSize = (Int, Int)
 type TextTable = [[String]]
 
 -- wouldn't be exported
@@ -36,18 +40,20 @@ data CellWrapper =
     cell :: Cell,
     rowNum :: Int, colNum :: Int, cellWidth :: Int, cellHeight :: Int,
     topLeft :: String, top :: String, topRight :: String, right :: String, bottomRight :: String,
-    bottom, bottomLeft, left :: String
+    bottom :: String, bottomLeft :: String, left :: String
   } deriving (Show)
 
 -- | Data type that represents table configuration.
 data SimpleTableConfig =
   SimpleTableConfig {
   -- | String containing table border characters, in order like this: "┌┬┐├┼┤└┴┘─│".
-  -- Must be exactly 11 characters, otherwise error will be thrown.
+  -- Must be exactly 11 characters long, otherwise error will be thrown.
   tableBorders :: String,
   -- | Minimum widths for each column, from left to right. Padding size is not counted.
+  -- List's length may not match the actual count of columns in a table.
   colMinWidths :: [Int],
   -- | Minimum heights for each row, from top to bottom. Padding size is not counted.
+  -- List's length may not match the actual count of rows in a table.
   rowMinHeights :: [Int],
   padFunction :: String -> Int -> String -> String,
   cellPadFunction :: String -> Int -> [String] -> [String],
@@ -55,9 +61,10 @@ data SimpleTableConfig =
   horizontalPadding :: Int,
   -- | Height of top and bottom margins.
   verticalPadding :: Int,
-  -- | String used to fill in paddings. \" \" by default.
+  -- | String used as padding. \" \" (space) by default.
   paddingStr :: String,
   -- | String used to fill in empty cells. \"\" by default.
+  -- Empty cells will be padded with 'paddingStr' after placing 'emptyCellStr' into each them.
   emptyCellStr :: String
   }
 
@@ -101,34 +108,18 @@ makeDefaultSimpleTable table =
 makeSimpleTable :: SimpleTableConfig -> [[String]] -> String
 makeSimpleTable config table =
     showTable $
-    map2 cell $
+    map2d cell $
     appendBorders $
     normalizeBorderLengths $
     wrapTable processedConfig $
     padTableCells processedConfig $
     makeCells $
-    normalizeColumnCount processedConfig $
-    makeTextTable table
+    normalizeColumnCount processedConfig $ table
     where
       processedConfig =
         constructPaddingFunctions $ validateConfig config
 
--- table processing
-
-
--- part 1:
--- convert `Show a => [[a]]` to TextTable (which is [[String]])
-
-makeTextTable :: [[String]] -> TextTable
-makeTextTable = makeTextTableWithShow id
-
-makeTextTableWithShow :: Show a => (a -> String) -> [[a]] -> TextTable
-makeTextTableWithShow showFunction table =
-    map (\x -> map showFunction x) table
-
-
--- part 2:
--- put something in empty cells
+-- | Put something in empty cells
 normalizeColumnCount :: SimpleTableConfig -> TextTable -> TextTable
 normalizeColumnCount config = normalizeColumnCountWithStr (emptyCellStr config)
 
@@ -140,99 +131,82 @@ normalizeColumnCountWithStr emptyCellStr textTable =
             | length row < columnCount = row ++ (take (columnCount - length row)
                 $ repeat emptyCellStr)
             | otherwise = row
-        columnCount = fst $ getTableSize textTable
+        columnCount = fst $ get2DListSize textTable
 
-
-getTableSize :: [[a]] -> TableSize
-getTableSize = get2DlistSize
-
-
--- part 3:
--- convert TextTable to Table by splitting each cell
+-- | convert TextTable to Table by splitting each cell
 -- line by line
-
 makeCells :: TextTable -> Table
-makeCells = makeCellsWith "\n"
-
-makeCellsWith :: String -> TextTable -> Table
-makeCellsWith lineSeparator textTable =
+makeCells textTable =
     map (\rowStr  -> map
-            (\cellStr -> splitCell cellStr) rowStr) textTable
+            (\cellStr -> splitOn "\n" cellStr) rowStr) textTable
     where
         splitCell :: String -> Cell
-        splitCell cellStr = splitOn lineSeparator cellStr
+        splitCell cellStr = splitOn "\n" cellStr
 
-getCellSizeTable :: Table -> CellSizeTable
-getCellSizeTable = map2 getCellSize
-
-
-get2DlistSize :: [[a]] -> (Int, Int)
-get2DlistSize list2d = (maximum $ map length list2d, length list2d)
-
-getCellSize :: Cell -> CellSize
-getCellSize = get2DlistSize
-
-
--- part 4:
--- pad all contents in Table
+get2DListSize :: [[a]] -> (Int, Int)
+get2DListSize list2d = (maximum $ map length list2d, length list2d)
 
 padTableCells :: SimpleTableConfig -> Table -> Table
 padTableCells config table = (padCellLines . addCellLines) table
   where
-    -- adds empty `CellLine`s to each `Cell`
-    addCellLines table = zipWith addExtraCellLines table realRowHeights -- (rowHeights (getCellSizeTable table))
+    -- add empty `CellLine`s to each `Cell`
+    addCellLines table = zipWith addExtraCellLines table realRowHeights
     addExtraCellLines row height = map
       (\cell -> (cellPadFunction config) "\n" height cell) row
     -- adds extra spaces to each `CellLine`
     padCellLines table = transpose $
       zipWith padCellList (transpose table) realColWidths
-    padCellList  col width = map
-      (\cell -> map
-               (\celLine ->
-                 (padFunction config) (paddingStr config) width celLine)
-               cell) col
-    -- calculate real column widths.
-    -- limits minimum column width by values from config
+
+    padCellList col width = map (\cell -> map
+                                  (\celLine ->
+                                   (padFunction config)
+                                   (paddingStr config)
+                                   width celLine)
+                                  cell) col
+
+    -- Calculate real column widths.
+    -- Minimum column widths are limited by values from config.
     realColWidths = zipWith max (colWidths cellSizeTable) ((colMinWidths config) ++ (repeat 0))
     realRowHeights = zipWith max (rowHeights cellSizeTable) ((rowMinHeights config) ++ (repeat 0))
-    cellSizeTable = getCellSizeTable table
+    cellSizeTable = map2d get2DListSize table
 
--- list of heights for each row
-rowHeights :: CellSizeTable -> [Int]
-rowHeights sizeTable = map
-  (\sth -> maximum $ map snd sth) sizeTable
+    -- list of heights for each row
+    rowHeights :: CellSizeTable -> [Int]
+    rowHeights sizeTable = maxOfMap2 snd sizeTable
 
--- list of widths for each column
-colWidths :: CellSizeTable -> [Int]
-colWidths sizeTable  = map
-  (\sth -> maximum $ map fst sth) $
-  transpose sizeTable
+    -- list of widths for each column
+    colWidths :: CellSizeTable -> [Int]
+    colWidths sizeTable  = maxOfMap2 fst $ transpose sizeTable
 
-
--- part 5:
--- join CellLines
+    maxOfMap2 :: (a -> Int) -> [[a]] -> [Int]
+    maxOfMap2 f = map (\sth -> maximum $ map f sth)
 
 -- | Join 'CellLine's
 wrapTable config table = wrapCells $ addCellCoords table
   where
+    -- Add cell coordinates for each cell.
+    -- e.g. [["a", "b"]] will be transformed to [[(1,1,"a"), (1,2,"b")]]
     addCellCoords :: Table -> [[(Int, Int, Cell)]]
     addCellCoords table = zipWith
       (\ rowNum list ->
-        map (\ (cellNum, cell) ->
-              (rowNum, cellNum, cell)) list) [1..] $
-      map (\ row -> zip [1..] $
-            map (\ cell ->
-                  map (\ cellLine -> cellLine) cell) row) table
+       -- Insert row numbers.
+        map (\ (colNum, cell) ->
+                 (rowNum, colNum, cell)) list) [1..] $
+      -- Enumerate columns
+      map (zip [1..]) table
     wrapCells :: [[(Int, Int, Cell)]] -> [[CellWrapper]]
-    wrapCells =
-      map2 wrapCell
+    wrapCells = map2d wrapCell
     wrapCell :: (Int, Int, Cell) -> CellWrapper
     wrapCell (rowNum, colNum, cell) =
-      (CellWrapper cell rowNum colNum cellWidth cellHeight
+      (CellWrapper cell rowNum colNum
+       -- cell width
+       (maximum $ map length cell)
+       -- cell height
+       (length cell)
        topLeft top topRight right bottomRight bottom bottomLeft left)
       where
-        cellHeight = length cell
-        cellWidth  = maximum $ map length cell
+        (width, height) = get2DListSize table
+        borders =  tableBorders config
         topLeft
           | rowNum == 1 && colNum == 1 = [borders !! 0]          -- ┌
           | colNum == 1 = [borders !! 3]                        -- ├
@@ -259,15 +233,10 @@ wrapTable config table = wrapCells $ addCellCoords table
           | otherwise  = ""
         top = [borders !! 9]                                    -- ─
         left = [borders !! 10]                                  -- │
-    -- table size
-    tableSize = getTableSize table
-    width = fst tableSize
-    height = snd tableSize
-    borders =  tableBorders config
 
 normalizeBorderLengths :: [[CellWrapper]] -> [[CellWrapper]]
 normalizeBorderLengths =
-  map2 normalizeBorderLength
+  map2d normalizeBorderLength
   where
     normalizeBorderLength :: CellWrapper -> CellWrapper
     normalizeBorderLength
@@ -284,7 +253,7 @@ normalizeBorderLengths =
 
 appendBorders :: [[CellWrapper]] -> [[CellWrapper]]
 appendBorders table =
-  map2 appendAll table
+  map2d appendAll table
   where
     appendAll
       (CellWrapper cell rowNum colNum cellWidth cellHeight topLeft
@@ -328,16 +297,16 @@ appendBorders table =
          cell)
        rowNum colNum cellWidth cellHeight topLeft
        top topRight right bottomRight bottom bottomLeft left)
-    width  = fst $ getTableSize table
-    height = snd $ getTableSize table
+    width  = fst $ get2DListSize table
+    height = snd $ get2DListSize table
 
 
--- part 6: join cells & rows
+-- part 5: join cells & rows
 
 showTable :: [[[String]]] -> String
 showTable textTable = strJoin "\n" $
   map (strJoin "\n") $
-  map2 (strJoin "") $
+  map2d (strJoin "") $
   map transpose textTable
     where
       strJoin :: String -> [String] -> String
@@ -346,7 +315,9 @@ showTable textTable = strJoin "\n" $
                               else
                                 foldr1 (\x y -> x ++ separator ++ y) lst
 
--- horizontal padding functions
+-- | Horizontal padding function.
+-- Appends padding string (first argument) to the left of the given string to make
+-- it's length equal to the second argument.
 simpleTableLeftPad :: String -> Int -> String -> String
 simpleTableLeftPad paddingStr width str
   | length str > width = error "SimpleTableGenerator: String's length is greater than maximum!"
@@ -354,6 +325,9 @@ simpleTableLeftPad paddingStr width str
     where
       padding = take (width - length str) $ concat $ repeat paddingStr
 
+-- | Horizontal padding function.
+-- Appends padding string (first argument) to the right of the given string to make
+-- it's length equal to the second argument.
 simpleTableRightPad :: String -> Int -> String -> String
 simpleTableRightPad paddingStr width str
   | length str > width = error "SimpleTableGenerator: String's length is greater than maximum!"
@@ -361,6 +335,9 @@ simpleTableRightPad paddingStr width str
     where
       padding = take (width - length str) $ concat $ repeat paddingStr
 
+-- | Horizontal padding function.
+-- Appends padding string (first argument) both to the right and left of the given string to make
+-- it's length equal to the second argument.
 simpleTableCenterPad :: String -> Int -> String -> String
 simpleTableCenterPad paddingStr width str
   | length str > width = error "SimpleTableGenerator: String's length is greater than maximum!"
@@ -371,7 +348,8 @@ simpleTableCenterPad paddingStr width str
       padding = concat $ repeat paddingStr
       halfPadding = take halfWidth padding
 
--- vertical padding functions
+-- | Vertical padding function.
+-- Appends padding to the bottom of given 'Cell'
 simpleTableBottomPad :: String -> Int -> Cell -> [String]
 simpleTableBottomPad cellStr height cell
   | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
@@ -380,6 +358,8 @@ simpleTableBottomPad cellStr height cell
     where
       padding = replicate (height - length cell) ""
 
+-- | Vertical padding function.
+-- Appends padding to the top of given 'Cell'
 simpleTableTopPad :: String -> Int -> Cell -> [String]
 simpleTableTopPad cellStr height cell
   | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
@@ -388,6 +368,8 @@ simpleTableTopPad cellStr height cell
     where
       padding = replicate (height - length cell) ""
 
+-- | Vertical padding function.
+-- Appends padding both to top and bottom of given 'Cell'
 simpleTableMiddlePad :: String -> Int -> Cell -> [String]
 simpleTableMiddlePad cellStr height cell
   | length cell > height = error "SimpleTableGenerator: Cell's height is greater than maximum!"
@@ -396,13 +378,6 @@ simpleTableMiddlePad cellStr height cell
   | otherwise = halfPadding ++ cell ++ halfPadding ++ [""]
     where
       halfPadding = replicate ((height - length cell) `div` 2) ""
-
-simpleTableAddVPadding :: (String -> Int -> Cell -> [String]) -> Int -> String -> Int -> Cell -> [String]
-simpleTableAddVPadding paddingFunction n =
-  (\ f cellStr height ->
-    padding ++ (f cellStr height) ++ padding) . paddingFunction
-  where
-    padding = (concat $ take n $ repeat [""])
 
 constructPaddingFunctions :: SimpleTableConfig -> SimpleTableConfig
 constructPaddingFunctions config = config {
@@ -429,7 +404,7 @@ validateConfig config
   | 0 > verticalPadding config = error "SimpleTableGenerator: verticalPadding must be >= 0!"
   | otherwise = config
 
--- functions
+-- misc functions
 
-map2 :: (a -> b) -> [[a]] -> [[b]]
-map2 =  map . map
+map2d :: (a -> b) -> [[a]] -> [[b]]
+map2d =  map . map

@@ -2,13 +2,15 @@
 
 ## About
 
-This library is for drawing text tables from 2d-lists.
+This library is for drawing text tables.
 
-Pass a list of lists of strings and get a single string with table contents.
+Pass a 2D-list of strings representing cells and get a single string with table contents.
 
 ```
 makeDefaultSimpleTable :: [[String]] -> String
 ```
+
+Newlines are supported.
 
 ## Basic usage
 
@@ -54,27 +56,4 @@ putStrLn $ makeSimpleTable simpleTableConfig {
 +---+----+
 ```
 
-### Custom borders
-Only single-character borders are currently supported.
-
-Default `tableBorders` are  `"┌┬┐├┼┤└┴┘─│"`
-### Limiting cell sizes
-You can set minimum cell sizes for each colon and row by constructing new `SimpleTableConfig` with appropriative `colMinWidths` and `rowMinHeights`.
-
-You are not able to set maximum cell sizes because they are calculating from passed list-of-lists-of-strings dynamically (and in any case text in each cell remains unchanged). If you still need to do this, you may manually wrap or cut long lines in your table before passing it to the library functions.
-
-### Padding cells
-There are two ways of customizing padding style:
-
-1. By changing `horizontalPadding` and/or `verticalPadding` of `SimpleTableConfig`
-2. By passing your own padding functions as `padFunction` and/or `cellPadFunction`
-
-   These functions must have the following type signatures:
-#### Horizontal padding
-```
-padFunction :: String -> Int -> String -> String
-```
-#### Vertical padding
-```
-cellPadFunction :: String -> Int -> [String] -> [String]
-```
+Check out the docs for more info.
