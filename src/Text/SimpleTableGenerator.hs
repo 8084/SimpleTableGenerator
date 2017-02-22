@@ -53,9 +53,9 @@ data SimpleTableConfig =
   -- | String containing table border characters, in order like this: "┌┬┐├┼┤└┴┘─│".
   -- Must be exactly 11 characters, otherwise error will be thrown.
   tableBorders :: String,
-  -- | Minimum widths for each column, from left to right.
+  -- | Minimum widths for each column, from left to right. Padding size is not counted.
   colMinWidths :: [Int],
-  -- | Minimum heights for each row, from top to bottom.
+  -- | Minimum heights for each row, from top to bottom. Padding size is not counted.
   rowMinHeights :: [Int],
   padFunction :: String -> Int -> String -> String,
   cellPadFunction :: String -> Int -> [String] -> [String],
@@ -199,8 +199,8 @@ padTableCells config table = (padCellLines . addCellLines) table
                cell) col
     -- calculate real colon widths.
     -- limits minimum colon width by values from config
-    realColWidths = zipWith max (colWidths cellSizeTable) ((colMinWidths config)++(repeat 0))
-    realRowHeights = zipWith max (rowHeights cellSizeTable) ((rowMinHeights config)++(repeat 0))
+    realColWidths = zipWith max (colWidths cellSizeTable) ((colMinWidths config) ++ (repeat 0))
+    realRowHeights = zipWith max (rowHeights cellSizeTable) ((rowMinHeights config) ++ (repeat 0))
     cellSizeTable = getCellSizeTable table
 
 -- list of heights for each row
@@ -421,19 +421,17 @@ simpleTableAddVPadding paddingFunction n =
   where
     padding = (concat $ take n $ repeat [""])
 
-simpleTableAddHPadding :: (String -> Int -> String -> String) -> Int  -> String -> Int -> String -> String
-simpleTableAddHPadding paddingFunction n =
-  (\ f padStr width -> padding  ++ (f padStr width) ++ padding) . paddingFunction
-  where
-    padding = take n $ concat $ repeat " "
-
 constructPaddingFunctions :: SimpleTableConfig -> SimpleTableConfig
 constructPaddingFunctions config = config {
-  padFunction = simpleTableAddHPadding (padFunction config) (horizontalPadding config),
+  padFunction = (\ f padStr width
+                     -> padding  ++ (f padStr width) ++ padding)
+                . (padFunction config),
   cellPadFunction = simpleTableAddVPadding (cellPadFunction config) (verticalPadding config),
   horizontalPadding = 0,
   verticalPadding = 0
   }
+  where
+    padding = take (horizontalPadding config) $ concat $ repeat (paddingStr config)
 
 validateConfig config
   | 0 == length (paddingStr config) = error "SimpleTableGenerator: paddingStr is empty!"
