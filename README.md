@@ -56,4 +56,4 @@ putStrLn $ makeSimpleTable simpleTableConfig {
 +---+----+
 ```
 
-Check out the docs for more info.
+Check out [the docs](https://hackage.haskell.org/package/SimpleTableGenerator-0.2.0.0/docs/Text-SimpleTableGenerator.html) for more info.
