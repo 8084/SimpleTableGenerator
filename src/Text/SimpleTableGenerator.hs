@@ -20,15 +20,6 @@ module Text.SimpleTableGenerator (
 import Data.List.Split (splitOn)
 import Data.List (transpose)
 
--- What you need to know to understand the code:
--- 1. `Table` is a list of `Row`s
--- 2. `Row` is a list of `Cell`s
--- 3. `Cell` is a list of `CellLine`s
--- 4. Each `CellLine` is a string without line breaks
--- 5. TextTable represents a table that is just a [[String]]
---    (so, these `String`s may contain line breaks)
--- 6. During execution, TextTable converts to Table step by step.
-
 -- types:
 type Table = [Row]
 type Row   = [Cell]
@@ -39,11 +30,12 @@ type CellSizeTable = [[CellSize]]
 type TableSize = (Int, Int)
 type TextTable = [[String]]
 
+-- wouldn't be exported
 data CellWrapper =
   CellWrapper {
     cell :: Cell,
-    rowNum, colNum, cellWidth, cellHeight :: Int,
-    topLeft, top, topRight, right, bottomRight,
+    rowNum :: Int, colNum :: Int, cellWidth :: Int, cellHeight :: Int,
+    topLeft :: String, top :: String, topRight :: String, right :: String, bottomRight :: String,
     bottom, bottomLeft, left :: String
   } deriving (Show)
 
@@ -109,13 +101,13 @@ makeDefaultSimpleTable table =
 makeSimpleTable :: SimpleTableConfig -> [[String]] -> String
 makeSimpleTable config table =
     showTable $
-    unwrapTable $
+    map2 cell $
     appendBorders $
     normalizeBorderLengths $
     wrapTable processedConfig $
     padTableCells processedConfig $
     makeCells $
-    normalizeColonCount processedConfig $
+    normalizeColumnCount processedConfig $
     makeTextTable table
     where
       processedConfig =
@@ -137,18 +129,18 @@ makeTextTableWithShow showFunction table =
 
 -- part 2:
 -- put something in empty cells
-normalizeColonCount :: SimpleTableConfig -> TextTable -> TextTable
-normalizeColonCount config = normalizeColonCountWithStr (emptyCellStr config)
+normalizeColumnCount :: SimpleTableConfig -> TextTable -> TextTable
+normalizeColumnCount config = normalizeColumnCountWithStr (emptyCellStr config)
 
-normalizeColonCountWithStr :: String -> TextTable -> TextTable
-normalizeColonCountWithStr emptyCellStr textTable =
+normalizeColumnCountWithStr :: String -> TextTable -> TextTable
+normalizeColumnCountWithStr emptyCellStr textTable =
     map (\row -> addExtraCells row) textTable
     where
         addExtraCells row
-            | length row < colonCount = row ++ (take (colonCount - length row)
+            | length row < columnCount = row ++ (take (columnCount - length row)
                 $ repeat emptyCellStr)
             | otherwise = row
-        colonCount = fst $ getTableSize textTable
+        columnCount = fst $ getTableSize textTable
 
 
 getTableSize :: [[a]] -> TableSize
@@ -173,6 +165,8 @@ makeCellsWith lineSeparator textTable =
 getCellSizeTable :: Table -> CellSizeTable
 getCellSizeTable = map2 getCellSize
 
+
+get2DlistSize :: [[a]] -> (Int, Int)
 get2DlistSize list2d = (maximum $ map length list2d, length list2d)
 
 getCellSize :: Cell -> CellSize
@@ -197,8 +191,8 @@ padTableCells config table = (padCellLines . addCellLines) table
                (\celLine ->
                  (padFunction config) (paddingStr config) width celLine)
                cell) col
-    -- calculate real colon widths.
-    -- limits minimum colon width by values from config
+    -- calculate real column widths.
+    -- limits minimum column width by values from config
     realColWidths = zipWith max (colWidths cellSizeTable) ((colMinWidths config) ++ (repeat 0))
     realRowHeights = zipWith max (rowHeights cellSizeTable) ((rowMinHeights config) ++ (repeat 0))
     cellSizeTable = getCellSizeTable table
@@ -208,7 +202,7 @@ rowHeights :: CellSizeTable -> [Int]
 rowHeights sizeTable = map
   (\sth -> maximum $ map snd sth) sizeTable
 
--- list of widths for each colon
+-- list of widths for each column
 colWidths :: CellSizeTable -> [Int]
 colWidths sizeTable  = map
   (\sth -> maximum $ map fst sth) $
@@ -338,18 +332,7 @@ appendBorders table =
     height = snd $ getTableSize table
 
 
--- part 6: unwrap cells
-
-unwrapTable :: [[CellWrapper]] -> [[Cell]]
-unwrapTable =
-  map2 unwrapCell
-  where
-    unwrapCell
-      CellWrapper {cell = cell} =
-      cell
-
-
--- part 7: join cells & rows
+-- part 6: join cells & rows
 
 showTable :: [[[String]]] -> String
 showTable textTable = strJoin "\n" $
@@ -423,15 +406,21 @@ simpleTableAddVPadding paddingFunction n =
 
 constructPaddingFunctions :: SimpleTableConfig -> SimpleTableConfig
 constructPaddingFunctions config = config {
-  padFunction = (\ f padStr width
-                     -> padding  ++ (f padStr width) ++ padding)
+  padFunction = (\ f padStr width ->
+                     let padding = take (horizontalPadding config) $
+                               concat $ repeat (paddingStr config) in
+                       padding  ++ (f padStr width) ++ padding)
                 . (padFunction config),
-  cellPadFunction = simpleTableAddVPadding (cellPadFunction config) (verticalPadding config),
+  cellPadFunction =
+      (\ f cellStr height ->
+           let padding = (concat
+                          $ take (verticalPadding config)
+                                $ repeat [""]) in
+           padding ++ (f cellStr height) ++ padding) .
+      (cellPadFunction config),
   horizontalPadding = 0,
   verticalPadding = 0
   }
-  where
-    padding = take (horizontalPadding config) $ concat $ repeat (paddingStr config)
 
 validateConfig config
   | 0 == length (paddingStr config) = error "SimpleTableGenerator: paddingStr is empty!"
@@ -443,4 +432,4 @@ validateConfig config
 -- functions
 
 map2 :: (a -> b) -> [[a]] -> [[b]]
-map2 = (.) map map
+map2 =  map . map
